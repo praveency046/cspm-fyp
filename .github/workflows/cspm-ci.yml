@@ -1,54 +1,69 @@
-name: CSPM CI Pipeline
+name: CSPM CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger
 
 jobs:
   cspm-scan:
     runs-on: ubuntu-latest
 
-    services:
-      localstack:
-        image: localstack/localstack
-        ports:
-          - 4566:4566
-        env:
-          SERVICES: s3,iam
-          DEFAULT_REGION: us-east-1
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # Step 1: Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      # Step 2: Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      - name: Install Python dependencies
-        run: pip install boto3
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform Init & Apply
-        working-directory: infra
+      # Step 3: Install dependencies
+      - name: Install dependencies
         run: |
-          terraform init -upgrade
-          terraform apply -auto-approve
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y jq terraform
 
+      # Step 4: Initialize Terraform
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init -upgrade
+
+      # Step 5: Apply Terraform (auto-approve)
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve
+
+      # Step 6: Run CSPM scanner
       - name: Run CSPM Scanner
         working-directory: scanner
-        run: python3 scanner_main.py
-
-      - name: Fail on Critical Findings
         run: |
-          if grep -q '"severity": "CRITICAL"' reports/cspm_report.json; then
-            echo "❌ Critical security issues found!"
+          python3 scanner_main.py
+
+      # Step 7: Send full report to Telegram & fail on any finding
+      - name: Send Full CSPM Report & Fail on Any Findings
+        run: |
+          # Convert JSON report into readable text
+          report=$(jq -r '.findings[] | "\(.resource) (\(.service)) → \(.severity): \(.issue)"' ../reports/cspm_report.json)
+          total=$(jq -r '.total_findings' ../reports/cspm_report.json)
+          scan_time=$(jq -r '.scan_time' ../reports/cspm_report.json)
+
+          message="📊 CSPM Scan Report\nTime: $scan_time\nTotal Findings: $total\n\n$report"
+
+          # Send full report to Telegram
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+               -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+               -d text="$message"
+
+          # Fail workflow if any findings exist
+          if [ "$total" -gt 0 ]; then
+            echo "❌ CSPM scan found $total issues. Stopping pipeline."
             exit 1
           else
-            echo "✅ No critical issues"
+            echo "✅ No issues found. Pipeline passes."
           fi
