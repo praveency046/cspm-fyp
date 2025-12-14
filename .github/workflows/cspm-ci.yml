@@ -37,11 +37,7 @@ jobs:
         run: |
           docker pull localstack/localstack:latest
           docker run -d --name localstack -p 4566:4566 -p 4571:4571 localstack/localstack
-          # Wait for S3 and IAM to be ready
-          until curl -s http://localhost:4566/_localstack/health | grep '"s3": "running"' > /dev/null; do
-            echo "Waiting for LocalStack..."
-            sleep 5
-          done 
+          
 
       # Step 4: Initialize Terraform
       - name: Terraform Init
