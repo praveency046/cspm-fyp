@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 
 def write_report(findings):
@@ -8,7 +9,13 @@ def write_report(findings):
         "findings": findings
     }
 
-    with open("../reports/cspm_report.json", "w") as f:
+    # Always write relative to scanner directory
+    reports_dir = os.path.join(os.getcwd(), "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    report_path = os.path.join(reports_dir, "cspm_report.json")
+
+    with open(report_path, "w") as f:
         json.dump(report, f, indent=4)
 
-    print("[+] Report written to reports/cspm_report.json")
+    print(f"[+] Report written to {report_path}")
