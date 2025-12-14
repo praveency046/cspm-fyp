@@ -1,7 +1,19 @@
-# Public S3 bucket
 resource "aws_s3_bucket" "public_bucket" {
   bucket = "test-public-bucket"
+}
+
+resource "aws_s3_bucket_acl" "public_bucket_acl" {
+  bucket = aws_s3_bucket.public_bucket.id
   acl    = "public-read"
+}
+
+resource "aws_s3_bucket" "public_write_bucket" {
+  bucket = "public-write-bucket"
+}
+
+resource "aws_s3_bucket_acl" "public_write_bucket_acl" {
+  bucket = aws_s3_bucket.public_write_bucket.id
+  acl    = "public-read-write"
 }
 
 # Weak IAM Policy
@@ -35,9 +47,4 @@ resource "aws_iam_policy" "wild_ec2_policy" {
 EOF
 }
 
-# Public write bucket (CRITICAL)
-resource "aws_s3_bucket" "public_write_bucket" {
-  bucket = "public-write-bucket"
-  acl    = "public-read-write"
-}
 
