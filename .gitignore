@@ -1,0 +1,15 @@
+# Terraform
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/.terraform.lock.hcl
+
+# Python
+__pycache__/
+*.pyc
+
+# Reports (generated)
+reports/cspm_report.json
+
+# OS
+.DS_Store

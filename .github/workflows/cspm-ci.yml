@@ -1,0 +1,54 @@
+name: CSPM CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  cspm-scan:
+    runs-on: ubuntu-latest
+
+    services:
+      localstack:
+        image: localstack/localstack
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,iam
+          DEFAULT_REGION: us-east-1
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Python dependencies
+        run: pip install boto3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init & Apply
+        working-directory: infra
+        run: |
+          terraform init -upgrade
+          terraform apply -auto-approve
+
+      - name: Run CSPM Scanner
+        working-directory: scanner
+        run: python3 scanner_main.py
+
+      - name: Fail on Critical Findings
+        run: |
+          if grep -q '"severity": "CRITICAL"' reports/cspm_report.json; then
+            echo "❌ Critical security issues found!"
+            exit 1
+          else
+            echo "✅ No critical issues"
+          fi
